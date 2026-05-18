@@ -30,12 +30,7 @@ def normaliser_adresse(addr):
 
 
 async def populate_queue(workqueue: Workqueue):
-    blacklist_cpr = [
-        "000000-0000",
-        "010101-0102",
-        "010101-0101",
-        "999999-9999"        
-    ]
+    blacklist_cpr = ["000000-0000", "010101-0102", "010101-0101", "999999-9999"]
 
     borgere = mysql_client.hent_borgere()
 
@@ -134,6 +129,9 @@ async def process_workqueue(workqueue: Workqueue):
                 # A WorkItemError represents a soft error that indicates the item should be passed to manual processing or a business logic fault
                 logger.error(f"Error processing item: {data}. Error: {e}")
                 item.fail(str(e))
+            except ValueError:
+                # Ugyldigt test CPR-nummer eller ingen data fundet for CPR-nummeret, skip.
+                continue
 
 
 if __name__ == "__main__":

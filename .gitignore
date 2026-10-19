@@ -2,3 +2,7 @@
 .env
 certifikater/*.crt
 certifikater/*.key
+
+# Python-cachefiler
+__pycache__/
+*.py[cod]

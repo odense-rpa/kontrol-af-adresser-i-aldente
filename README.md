@@ -18,7 +18,7 @@ Kontrollerer om borgeres adresser i AlDente (Specialtandplejens journalsystem) e
 - [`uv`](https://docs.astral.sh/uv/) til pakkehåndtering
 - Adgang til **Automation Server** (arbejdskø)
 - Adgang til **AlDente**-databasen (MySQL)
-- Adgang til **Datafordeler** inkl. certifikater (`datafordeler.crt` og `datafordeler.key`)
+- Adgang til **Datafordeler** via credential `Datafordeler` i Automation Server
 
 ## Installation
 
@@ -37,7 +37,6 @@ Credentials registreres i Automation Server:
 | `ATS_URL` | URL til Automation Server API (f.eks. `http://localhost/api`) |
 | `ATS_TOKEN` | Adgangstoken til Automation Server |
 | `ATS_WORKQUEUE_OVERRIDE` | Overstyrer arbejdskø-ID (bruges til udvikling/test) |
-| `CERTIFIKATER` | Sti til mappe med certifikater til Datafordeler-klienten (standard: `/certifikater`) |
 
 ## Kørsel
 

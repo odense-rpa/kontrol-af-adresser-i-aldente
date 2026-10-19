@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import sys
-import os
 import Levenshtein
 
 from automation_server_client import (
@@ -11,12 +10,12 @@ from automation_server_client import (
     Credential,
     WorkItemStatus,
 )
-from datafordeler import Datafordeler as DatafordelerClient
+from datafordeler import DatafordelerGraphQL
 from odk_tools.tracking import Tracker
 from odk_tools.reporting import report
 from process.mysql_client import MySQLClient
 
-datafordeler: DatafordelerClient
+datafordeler: DatafordelerGraphQL
 mysql_client: MySQLClient
 tracker: Tracker
 
@@ -49,12 +48,10 @@ async def process_workqueue(workqueue: Workqueue):
             data = item.data  # Item data deserialized from json as dict
 
             try:
-                person_oplysninger = datafordeler.hent_personoplysninger(
-                    cpr=str(data["Cpr"]).replace("-", "")
-                )
+                person = datafordeler.hent_person(str(data["Cpr"]).replace("-", ""))
 
                 # Kontroller om borger er død
-                if person_oplysninger.get("Person").get("status") == "doed":
+                if person.er_død:
                     report(
                         report_id="kontrol_af_adresser_i_aldente",
                         group="Død",
@@ -68,18 +65,15 @@ async def process_workqueue(workqueue: Workqueue):
                     tracker.track_partial_task(proces_navn)
                     continue
 
-                aktiv_adresse = datafordeler.hent_aktiv_adresse(
-                    cpr=str(data["Cpr"]).replace("-", "")
-                )
-                formateret_adresse = datafordeler.formater_adresse(
-                    aktiv_adresse.get("Adresseoplysninger", {})
-                )
+                # Borgere uden aktuel adresse springes over, som med REST-klienten
+                adresse = person.adresse
+                if adresse is None:
+                    continue
+                formateret_adresse = adresse.formateret()
                 formateret_adresse_norm = normaliser_adresse(formateret_adresse)
 
                 # Kontroller kommuneskift
-                if aktiv_adresse.get("Adresseoplysninger", {}).get(
-                    "CprAdresse", {}
-                ).get("cprKommunekode").lstrip("0") != data.get("Kommunekode"):
+                if adresse.kommunekode != data.get("Kommunekode"):
                     report(
                         report_id="kontrol_af_adresser_i_aldente",
                         group="Kommuneskift",
@@ -87,7 +81,7 @@ async def process_workqueue(workqueue: Workqueue):
                             "Cpr": data["Cpr"],
                             "Navn": f"{data.get('Fornavn', '')} {data.get('Efternavn', '')}",
                             "Adresse i AlDente": f"{data.get('Adresse', '')}, {data.get('Postnummer', '')} {data.get('By', '')} ({data.get('Kommunekode', '')})",
-                            "Adresse i stamdata": f"{formateret_adresse} ({aktiv_adresse.get('Adresseoplysninger', {}).get('CprAdresse', {}).get('cprKommunekode')})",
+                            "Adresse i stamdata": f"{formateret_adresse} ({adresse.kommunekode})",
                         },
                     )
                     tracker.track_task(proces_navn)
@@ -108,7 +102,7 @@ async def process_workqueue(workqueue: Workqueue):
                             "Cpr": data["Cpr"],
                             "Navn": f"{data.get('Fornavn', '')} {data.get('Efternavn', '')}",
                             "Adresse i AlDente": f"{data.get('Adresse', '')}, {data.get('Postnummer', '')} {data.get('By', '')} ({data.get('Kommunekode', '')})",
-                            "Adresse i stamdata": f"{formateret_adresse} ({aktiv_adresse.get('Adresseoplysninger', {}).get('CprAdresse', {}).get('cprKommunekode')})",
+                            "Adresse i stamdata": f"{formateret_adresse} ({adresse.kommunekode})",
                         },
                     )
                     tracker.track_task(proces_navn)
@@ -120,7 +114,7 @@ async def process_workqueue(workqueue: Workqueue):
                             "Cpr": data["Cpr"],
                             "Navn": f"{data.get('Fornavn', '')} {data.get('Efternavn', '')}",
                             "Adresse i AlDente": f"{data.get('Adresse', '')}, {data.get('Postnummer', '')} {data.get('By', '')} ({data.get('Kommunekode', '')})",
-                            "Adresse i stamdata": f"{formateret_adresse} ({aktiv_adresse.get('Adresseoplysninger', {}).get('CprAdresse', {}).get('cprKommunekode')})",
+                            "Adresse i stamdata": f"{formateret_adresse} ({adresse.kommunekode})",
                         },
                     )
                     tracker.track_partial_task(proces_navn)
@@ -139,6 +133,7 @@ if __name__ == "__main__":
     workqueue = ats.workqueue()
 
     aldente_credential = Credential.get_credential("AlDente - database")
+    datafordeler_credential = Credential.get_credential("Datafordeler")
     tracking_credential = Credential.get_credential("Odense SQL Server")
 
     tracker = Tracker(
@@ -154,11 +149,9 @@ if __name__ == "__main__":
         database=aldente_credential.data["database"],
     )
 
-    # Overskriv stien i forbindelse med udvikling
-    certifikat_sti = os.getenv("CERTIFIKATER", "/certifikater")
-    datafordeler = DatafordelerClient(
-        certifikat_sti=os.path.join(certifikat_sti, "datafordeler.crt"),
-        certifikat_nøglefil=os.path.join(certifikat_sti, "datafordeler.key"),
+    datafordeler = DatafordelerGraphQL(
+        client_id=datafordeler_credential.username,
+        client_secret=datafordeler_credential.password,
     )
 
     # Queue management

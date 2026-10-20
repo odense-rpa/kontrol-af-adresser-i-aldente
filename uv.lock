@@ -86,11 +86,10 @@ wheels = [
 
 [[package]]
 name = "datafordeler"
-version = "0.1.0"
-source = { git = "https://github.com/odense-rpa/datafordeler.git?rev=main#711524eda2d1ffba7ad30598f2731b7fe48da627" }
+version = "1.0.0"
+source = { git = "https://github.com/odense-rpa/datafordeler.git?rev=main#485d7522e465f19ace00ab9399ac6a54e278745f" }
 dependencies = [
     { name = "httpx" },
-    { name = "ruff" },
 ]
 
 [[package]]
